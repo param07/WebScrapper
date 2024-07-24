@@ -1,4 +1,4 @@
-from config import PAGE_LIMIT, PROXY, SCRAPE_URL, RETRY_COUNT, RETRY_DELAY, IMAGE_FOLDER
+from config import PAGE_LIMIT, PROXY, SCRAPE_URL, RETRY_COUNT, RETRY_DELAY, IMAGE_FOLDER, JSON_FOLDER, JSON_FILE_NAME
 import requests
 import time
 from bs4 import BeautifulSoup
@@ -19,6 +19,7 @@ class Scraper():
         self.totalRecords = 0
         self.recordsPerPage = 0
         self.scrapedData = []
+        # self.imageSet = set()
         # self.currRecordsCount = 0
 
     def hitURL(self, url):
@@ -30,8 +31,15 @@ class Scraper():
     
     def downloadImage(self, imageURL):
         imageRes = requests.get(imageURL)
-        imageName = imageURL.split('/')[-1]
+        # self.imageSet.add(imageURL)
+        # print(imageURL)
+        splitImage = imageURL.split('/')
+        imageName = splitImage[-1]
+        year = splitImage[-3]
+        month = splitImage[-2]
+        imageName = year + month + imageName
         imagePath = os.path.join(IMAGE_FOLDER, imageName)
+        # print(imagePath)
         os.makedirs(os.path.dirname(imagePath), exist_ok=True)
         with open(imagePath, 'wb') as file:
             file.write(imageRes.content)
@@ -51,14 +59,14 @@ class Scraper():
                 heading = card.find('h2', {'class': 'woo-loop-product__title'})
                 if(heading):
                     product_title = heading.text.strip()
-                    print(product_title)
+                    # print(product_title)
 
                 price = card.find('span', {'class': 'price'})
                 if(price and price.find('bdi')):
                     val = (price.find('bdi')).text.strip()
                     currency = ((price.find('bdi')).find('span', 'woocommerce-Price-currencySymbol')).text.strip()
                     product_price = float(val[1:])
-                    print(product_price)
+                    # print(product_price)
 
                 image = card.find('div', {'class': 'mf-product-thumbnail'})
                 if(image and image.find('img')):
@@ -109,16 +117,19 @@ class Scraper():
 
     def parseResults(self, responses):
         for resp in responses:
-            soup = BeautifulSoup(resp, 'html.parser')
-            if(soup.find('div', {'class': 'product-inner'}) and soup.find_all('div', {'class': 'product-inner'})):
-                allCards = soup.find_all('div', {'class': 'product-inner'})
-                self.getPageDetails(allCards)
+            if resp:
+                soup = BeautifulSoup(resp, 'html.parser')
+                if(soup.find('div', {'class': 'product-inner'}) and soup.find_all('div', {'class': 'product-inner'})):
+                    allCards = soup.find_all('div', {'class': 'product-inner'})
+                    self.getPageDetails(allCards)
 
     def addDataToJson(self):
-        with open('storage/scrapedData.json', 'w') as file:
+        jsonFilePath = os.path.join(JSON_FOLDER, JSON_FILE_NAME)
+        os.makedirs(os.path.dirname(jsonFilePath), exist_ok=True)
+        with open(jsonFilePath, 'w') as file:
             json.dump(self.scrapedData, file, indent=4)
 
-    def scrape(self):
+    async def scrape(self):
         # hit url first time to get total records and total pages
         isSuccess = False
         for i in range(RETRY_COUNT):
@@ -153,10 +164,12 @@ class Scraper():
                     break
                 else:
                     print(f"Retry {i+1}/{RETRY_COUNT} for URL: {self.baseURL} due to status code {res.status_code}")
-                    time.sleep(RETRY_DELAY)
+                    # time.sleep(RETRY_DELAY)
+                    await asyncio.sleep(RETRY_DELAY)
             except Exception as e:
                 print(f"Retry {i+1}/{RETRY_COUNT} for URL: {self.baseURL} due to exception: {e}")
-                time.sleep(RETRY_DELAY)
+                # time.sleep(RETRY_DELAY)
+                await asyncio.sleep(RETRY_DELAY)
 
         if not isSuccess:
             print(f"Failed to fetch page {self.baseURL} after {RETRY_COUNT} retries.")
@@ -172,7 +185,7 @@ class Scraper():
             proxies = None
             if(self.proxy):
                 proxies = {'http': self.proxy, 'https': self.proxy}
-            responses = asyncio.run(self.startAsyncTasks(urls, proxies))
+            responses = await (self.startAsyncTasks(urls, proxies))
             self.parseResults(responses)
 
         self.addDataToJson()
@@ -180,6 +193,9 @@ class Scraper():
 
     def getScrapedDataCount(self):
         return len(self.scrapedData)
+    
+    # def getScrapedImageUrlCount(self):
+    #     return self.imageSet
 
 
         

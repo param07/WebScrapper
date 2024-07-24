@@ -18,8 +18,9 @@ async def root():
 @app.post('/scrape')
 async def scrape():
     scraper = Scraper(pageLimit = PAGE_LIMIT, proxy = PROXY, baseUrl = SCRAPE_URL)
-    scraper.scrape()
+    await scraper.scrape()
     notifyScrapingResult(scraper.getScrapedDataCount())
+    # print(len(scraper.imageSet))
     return {"message": "Scraping of Data completed successfully"}
 
 
