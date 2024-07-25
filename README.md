@@ -13,6 +13,8 @@ For Windows, after checkout of the code
 > pip install -r requirements.txt  # To install dependencies
 > python main.py                # To run the application
 ```
+Then we can access the our FastAPI APIs using the URL: http://127.0.0.1:8000/docs
+
 ## Environment Variables
 
 To run this project, you will need to configure the following environment variables to your config.py file as per your requirements
